@@ -40,19 +40,19 @@ class DOMRange{
 		return $txt;
 	}
 	
-	public function offsetToTextNode( $offset ){
+	public function offsetToTextNode( $offset, $nextNode_ = true ){
 		//$liText = $this->getTextNodes();
-		return $this->recOffset($this->doc, max($offset,0));
+		return $this->recOffset($this->doc, max($offset,0), $nextNode_);
 	}
 	
-	private function recOffset(DOMNode $ndPai, $offset, &$len = 0){
+	private function recOffset(DOMNode $ndPai, $offset, $nextNode_, &$len = 0){
 		foreach( $ndPai->childNodes as $ndFilho ){
 			if( $ndFilho->nodeType == 3 ){
 				$txtLen = mb_strlen( $ndFilho->nodeValue );
 				$len += $txtLen;
-				if( $len > $offset ) return ['nd'=>$ndFilho,'offset'=>$txtLen - ($len - $offset)];
+				if( $len > $offset || ($len >= $offset && !$nextNode_) ) return ['nd'=>$ndFilho,'offset'=>$txtLen - ($len - $offset)];
 			}else if($ndFilho->nodeType == 1){
-				if($ret = $this->recOffset($ndFilho, $offset, $len))return $ret;
+				if($ret = $this->recOffset($ndFilho, $offset, $nextNode_, $len))return $ret;
 			}
 		}
 		return false;
@@ -64,6 +64,7 @@ class DOMRange{
 		foreach($xpath->query(".//text()") as $ndTxt) $aResp[] = $ndTxt;
 		return $aResp;
 	}
+	
 	
 	public function createDocumentFragment() {
 		return $this->doc->createDocumentFragment();
