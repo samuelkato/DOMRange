@@ -34,6 +34,37 @@ class DOMRange{
 		$this->commonAncestorContainer = $doc;
 	}
 	
+	public function getFlatText(){
+		$txt = '';
+		foreach($this->getTextNodes() as $ndTxt) $txt .= $ndTxt->nodeValue;
+		return $txt;
+	}
+	
+	public function offsetToTextNode( $offset ){
+		//$liText = $this->getTextNodes();
+		return $this->recOffset($this->doc, max($offset,0));
+	}
+	
+	private function recOffset(DOMNode $ndPai, $offset, &$len = 0){
+		foreach( $ndPai->childNodes as $ndFilho ){
+			if( $ndFilho->nodeType == 3 ){
+				$txtLen = mb_strlen( $ndFilho->nodeValue );
+				$len += $txtLen;
+				if( $len > $offset ) return ['nd'=>$ndFilho,'offset'=>$txtLen - ($len - $offset)];
+			}else if($ndFilho->nodeType == 1){
+				if($ret = $this->recOffset($ndFilho, $offset, $len))return $ret;
+			}
+		}
+		return false;
+	}
+	
+	public function getTextNodes(){
+		$aResp = array();
+		$xpath = new DOMXPath($this->doc);
+		foreach($xpath->query(".//text()") as $ndTxt) $aResp[] = $ndTxt;
+		return $aResp;
+	}
+	
 	public function createDocumentFragment() {
 		return $this->doc->createDocumentFragment();
 	}
@@ -415,11 +446,11 @@ class DOMRange{
 		}
 
 		// ascend the ancestor hierarchy until we have a common parent.
-		for ($sp = $startNode->parentNode, $ep = $endNode->parentNode; $sp != $ep; $sp = $sp->parentNode, $ep = $ep->parentNode) {
+		for ($sp = $startNode->parentNode, $ep = $endNode->parentNode; $sp !== $ep; $sp = $sp->parentNode, $ep = $ep->parentNode) {
 			$startNode = $sp;
 			$endNode = $ep;
 		}
-
+		
 		return $this->_traverseCommonAncestors($startNode, $endNode, $how);
 	}
 
@@ -615,6 +646,7 @@ class DOMRange{
 		if ($frag) {
 			$frag->appendChild($n);
 		}
+		
 
 		$commonParent = $startAncestor->parentNode;
 		$startOffset = $this->nodeIndex($startAncestor);
@@ -815,7 +847,7 @@ class DOMRange{
 	private function nodeIndex(DOMNode $n){
 		$cnt = 0;
 		foreach($n->parentNode->childNodes as $n2){
-			if($n === $n2)return $cnt;
+			if($n->isSameNode($n2))return $cnt;
 			$cnt++;
 		}
 		return false;
