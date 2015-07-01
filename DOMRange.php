@@ -71,10 +71,12 @@ class DOMRange{
 	}
 
 	public function setStart(DOMNode $n, $o) {
+		if(!$n instanceof DOMNode)throw new Exception("arg 1 deve ser um DOMNode");
 		$this->_setEndPoint(true, $n, $o);
 	}
 
 	public function setEnd(DOMNode $n, $o) {
+		if(!$n instanceof DOMNode)throw new Exception("arg 1 deve ser um DOMNode");
 		$this->_setEndPoint(false, $n, $o);
 	}
 
@@ -486,9 +488,9 @@ class DOMRange{
 				$n = $this->START_CONTAINER;
 				$start = $this->START_OFFSET;
 				$len = $this->END_OFFSET - $this->START_OFFSET;
-
-				if ($start === 0 && $len >= mb_strlen($n->nodeValue) - 1) {
-					$n->parentNode.removeChild(n);
+				
+				if ($start === 0 && $len >= mb_strlen($n->nodeValue)) {
+					$n->parentNode->removeChild($n);
 				} else {
 					$n->deleteData($start, $len);
 				}
@@ -852,6 +854,12 @@ class DOMRange{
 			$cnt++;
 		}
 		return false;
+	}
+
+	private function insertAfter(DOMNode $n, DOMNode $cont){
+		$pai = $cont->parentNode;
+		if($cont === $pai->lastChild)$pai->appendChild($n);
+		else $pai->insertBefore($n,$cont->nextSibling);
 	}
 }
 /*
