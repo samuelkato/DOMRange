@@ -34,9 +34,11 @@ class DOMRange{
 		$this->commonAncestorContainer = $doc;
 	}
 	
-	public function getFlatText(){
+	public function getFlatText( $ns = '', $br_ = false ){
 		$txt = '';
-		foreach($this->getTextNodes() as $ndTxt) $txt .= $ndTxt->nodeValue;
+		foreach($this->getTextNodes( $ns ) as $ndTxt){
+			$txt .= $ndTxt->nodeType === 3 ? $ndTxt->nodeValue : " ";
+		}
 		return $txt;
 	}
 	
@@ -47,21 +49,30 @@ class DOMRange{
 	
 	private function recOffset(DOMNode $ndPai, $offset, $nextNode_, &$len = 0){
 		foreach( $ndPai->childNodes as $ndFilho ){
-			if( $ndFilho->nodeType == 3 ){
+			if( $ndFilho->nodeType === 3 ){
 				$txtLen = mb_strlen( $ndFilho->nodeValue );
 				$len += $txtLen;
 				if( $len > $offset || ($len >= $offset && !$nextNode_) ) return ['nd'=>$ndFilho,'offset'=>$txtLen - ($len - $offset)];
-			}else if($ndFilho->nodeType == 1){
+			}else if($ndFilho->nodeType === 1){
 				if($ret = $this->recOffset($ndFilho, $offset, $nextNode_, $len))return $ret;
 			}
 		}
 		return false;
 	}
 	
-	public function getTextNodes(){
+	public function getTextNodes( $ns = '' ){
 		$aResp = array();
 		$xpath = new DOMXPath($this->doc);
-		foreach($xpath->query(".//text()") as $ndTxt) $aResp[] = $ndTxt;
+		
+		if($ns){
+			$xpath->registerNamespace('ns', $ns);
+			//$li = $xpath->query(".//ns:*/text()|.//ns:br");
+			$li = $xpath->query(".//ns:*/text()");
+		}else{
+			//$li = $xpath->query(".//text()|//br");
+			$li = $xpath->query(".//text()");
+		}
+		foreach($li as $ndTxt) $aResp[] = $ndTxt;
 		return $aResp;
 	}
 	
@@ -182,13 +193,13 @@ class DOMRange{
 		} else {
 			// Insert element node
 			if ($startContainer->childNodes->length > 0) {
-				$o = $startContainer->childNodes[$startOffset];
+				$o = $startContainer->childNodes->item($startOffset);
 			}
 
 			if ($o) {
 				$startContainer->insertBefore($n, $o);
 			} else {
-				if ($startContainer->nodeType == 3) {
+				if ($startContainer->nodeType === 3) {
 					$this->insertAfter($n, $startContainer);
 				} else {
 					$startContainer->appendChild($n);
@@ -220,7 +231,7 @@ class DOMRange{
 	private function _getSelectedNode($container, $offset) {
 		$child;
 
-		if ($container->nodeType == 3 ) {
+		if ($container->nodeType === 3 ) {
 			return $container;
 		}
 
@@ -242,7 +253,7 @@ class DOMRange{
 	}
 
 	private function _isCollapsed() {
-		return ($this->START_CONTAINER === $this->END_CONTAINER && $this->START_OFFSET == $this->END_OFFSET);
+		return ($this->START_CONTAINER === $this->END_CONTAINER && $this->START_OFFSET === $this->END_OFFSET);
 	}
 
 	private function _compareBoundaryPoints(DOMNode $containerA, $offsetA, DOMNode $containerB, $offsetB) {
@@ -258,10 +269,9 @@ class DOMRange{
 		// equal to the offset of B, and A is after B if its offset is greater than the
 		// offset of B.
 		if ($containerA === $containerB) {
-			if ($offsetA == $offsetB) {
+			if ($offsetA === $offsetB) {
 				return 0; // equal
 			}
-
 			if ($offsetA < $offsetB) {
 				return -1; // before
 			}
@@ -273,7 +283,7 @@ class DOMRange{
 		// container of B. In this case, A is before B if the offset of A is less than or
 		// equal to the index of the child node C and A is after B otherwise.
 		$c = $containerB;
-		while ($c && $c->parentNode != $containerA) {
+		while ($c && $c->parentNode !== $containerA) {
 			$c = $c->parentNode;
 		}
 
@@ -281,7 +291,7 @@ class DOMRange{
 			$offsetC = 0;
 			$n = $containerA->firstChild;
 
-			while ($n != $c && $offsetC < $offsetA) {
+			while ($n !== $c && $offsetC < $offsetA) {
 				$offsetC++;
 				$n = $n->nextSibling;
 			}
@@ -297,7 +307,7 @@ class DOMRange{
 		// of A. In this case, A is before B if the index of the child node C is less than
 		// the offset of B and A is after B otherwise.
 		$c = $containerA;
-		while ($c && $c->parentNode != $containerB) {
+		while ($c && $c->parentNode !== $containerB) {
 			$c = $c->parentNode;
 		}
 
@@ -305,7 +315,7 @@ class DOMRange{
 			$offsetC = 0;
 			$n = $containerB->firstChild;
 
-			while ($n != $c && $offsetC < $offsetB) {
+			while ($n !== $c && $offsetC < $offsetB) {
 				$offsetC++;
 				$n = $n->nextSibling;
 			}
@@ -324,7 +334,7 @@ class DOMRange{
 		$cmnRoot = $this->findCommonAncestor($containerA, $containerB);
 		$childA = $containerA;
 
-		while ($childA && $childA->parentNode != $cmnRoot) {
+		while ($childA && $childA->parentNode !== $cmnRoot) {
 			$childA = $childA->parentNode;
 		}
 
@@ -333,7 +343,7 @@ class DOMRange{
 		}
 
 		$childB = $containerB;
-		while ($childB && $childB->parentNode != $cmnRoot) {
+		while ($childB && $childB->parentNode !== $cmnRoot) {
 			$childB = $childB->parentNode;
 		}
 
@@ -392,6 +402,8 @@ class DOMRange{
 			// end position. To enforce this restriction, if the start is set to
 			// be at a position after the end, the Range is collapsed to that
 			// position.
+			
+			
 			if ($this->_compareBoundaryPoints($this->START_CONTAINER, $this->START_OFFSET, $this->END_CONTAINER, $this->END_OFFSET) > 0) {
 				$this->collapse($st);
 			}
@@ -468,7 +480,7 @@ class DOMRange{
 		$start;
 		$len;
 
-		if ($how != self::DELETE) {
+		if ($how !== self::DELETE) {
 			$frag = $this->createDocumentFragment();
 		}
 
@@ -478,16 +490,17 @@ class DOMRange{
 		}
 
 		// Text node needs special case handling
-		if ($this->START_CONTAINER->nodeType == 3 ) {
+		if ($this->START_CONTAINER->nodeType === 3 ) {
 			// get the substring
 			$s = $this->START_CONTAINER->nodeValue;
-			$sub = substr($s, $this->START_OFFSET, $this->END_OFFSET);
-
+			$len = $this->END_OFFSET - $this->START_OFFSET;
+			$sub = mb_substr($s, $this->START_OFFSET, $len, "utf-8");
+			
 			// set the original text node to its new value
-			if ($how != self::CLONAR) {
+			if ($how !== self::CLONAR) {
 				$n = $this->START_CONTAINER;
 				$start = $this->START_OFFSET;
-				$len = $this->END_OFFSET - $this->START_OFFSET;
+				
 				
 				if ($start === 0 && $len >= mb_strlen($n->nodeValue)) {
 					$n->parentNode->removeChild($n);
@@ -499,7 +512,7 @@ class DOMRange{
 				$this->collapse(TRUE);
 			}
 
-			if ($how == self::DELETE) {
+			if ($how === self::DELETE) {
 				return;
 			}
 
@@ -527,7 +540,7 @@ class DOMRange{
 		}
 
 		// Nothing is partially selected, so collapse to start point
-		if ($how != self::CLONAR) {
+		if ($how !== self::CLONAR) {
 			$this->collapse(TRUE);
 		}
 
@@ -542,7 +555,7 @@ class DOMRange{
 		$sibling;
 		$xferNode;
 
-		if ($how != DELETE) {
+		if ($how !== DELETE) {
 			$frag = $this->createDocumentFragment();
 		}
 
@@ -558,7 +571,7 @@ class DOMRange{
 		if ($cnt <= 0) {
 			// Collapse to just before the endAncestor, which
 			// is partially selected.
-			if ($how != self::CLONAR) {
+			if ($how !== self::CLONAR) {
 				$this->setEndBefore($endAncestor);
 				$this->collapse(FALSE);
 			}
@@ -581,7 +594,7 @@ class DOMRange{
 
 		// Collapse to just before the endAncestor, which
 		// is partially selected.
-		if ($how != self::CLONAR) {
+		if ($how !== self::CLONAR) {
 			$this->setEndBefore($endAncestor);
 			$this->collapse(FALSE);
 		}
@@ -597,7 +610,7 @@ class DOMRange{
 		$sibling;
 		$xferNode;
 
-		if ($how != self::DELETE) {
+		if ($how !== self::DELETE) {
 			$frag = $this->createDocumentFragment();
 		}
 
@@ -623,7 +636,7 @@ class DOMRange{
 			$n = $sibling;
 		}
 
-		if ($how != self::CLONAR) {
+		if ($how !== self::CLONAR) {
 			$this->setStartAfter($startAncestor);
 			$this->collapse(TRUE);
 		}
@@ -641,7 +654,7 @@ class DOMRange{
 		$sibling;
 		$nextSibling;
 
-		if ($how != self::DELETE) {
+		if ($how !== self::DELETE) {
 			$frag = $this->createDocumentFragment();
 		}
 
@@ -677,7 +690,7 @@ class DOMRange{
 			$frag->appendChild($n);
 		}
 
-		if ($how != self::CLONAR) {
+		if ($how !== self::CLONAR) {
 			$this->setStartAfter($startAncestor);
 			$this->collapse(TRUE);
 		}
@@ -692,7 +705,7 @@ class DOMRange{
 		$prevSibling;
 		$clonedChild;
 		$clonedGrandParent;
-		$isFullySelected = $next != $this->END_CONTAINER;
+		$isFullySelected = $next !== $this->END_CONTAINER;
 
 		if ($next === $root) {
 			return $this->_traverseNode($next, $isFullySelected, FALSE, $how);
@@ -706,7 +719,7 @@ class DOMRange{
 				$prevSibling = $next->previousSibling;
 				$clonedChild = $this->_traverseNode($next, $isFullySelected, FALSE, $how);
 
-				if ($how != self::DELETE) {
+				if ($how !== self::DELETE) {
 					$clonedParent->insertBefore($clonedChild, $clonedParent->firstChild);
 				}
 
@@ -723,8 +736,8 @@ class DOMRange{
 
 			$clonedGrandParent = $this->_traverseNode($parent, FALSE, FALSE, $how);
 
-			if ($how != self::DELETE) {
-				$this->clonedGrandParent->appendChild($clonedParent);
+			if ($how !== self::DELETE) {
+				$clonedGrandParent->appendChild($clonedParent);
 			}
 
 			$clonedParent = $clonedGrandParent;
@@ -733,7 +746,7 @@ class DOMRange{
 
 	private function _traverseLeftBoundary($root, $how) {
 		$next = $this->_getSelectedNode($this->START_CONTAINER, $this->START_OFFSET);
-		$isFullySelected = $next != $this->START_CONTAINER;
+		$isFullySelected = $next !== $this->START_CONTAINER;
 		$parent;
 		$clonedParent;
 		$nextSibling;
@@ -752,7 +765,7 @@ class DOMRange{
 				$nextSibling = $next->nextSibling;
 				$clonedChild = $this->_traverseNode($next, $isFullySelected, TRUE, $how);
 
-				if ($how != self::DELETE) {
+				if ($how !== self::DELETE) {
 					$clonedParent->appendChild($clonedChild);
 				}
 
@@ -769,7 +782,7 @@ class DOMRange{
 
 			$clonedGrandParent = $this->_traverseNode($parent, FALSE, TRUE, $how);
 
-			if ($how != self::DELETE) {
+			if ($how !== self::DELETE) {
 				$clonedGrandParent->appendChild($clonedParent);
 			}
 
@@ -788,24 +801,24 @@ class DOMRange{
 			return $this->_traverseFullySelected($n, $how);
 		}
 
-		if ($n->nodeType == 3 ) {
+		if ($n->nodeType === 3 ) {
 			$txtValue = $n->nodeValue;
 
 			if ($isLeft) {
 				$offset = $this->START_OFFSET;
-				$newNodeValue = substr($txtValue,$offset);
-				$oldNodeValue = substr($txtValue, 0, $offset);
+				$newNodeValue = mb_substr($txtValue,$offset);
+				$oldNodeValue = mb_substr($txtValue, 0, $offset);
 			} else {
 				$offset = $this->END_OFFSET;
-				$newNodeValue = substr($txtValue, 0, $offset);
-				$oldNodeValue = substr($txtValue, $offset);
+				$newNodeValue = mb_substr($txtValue, 0, $offset);
+				$oldNodeValue = mb_substr($txtValue, $offset);
 			}
 
-			if ($how != self::CLONAR) {
+			if ($how !== self::CLONAR) {
 				$n->nodeValue = $oldNodeValue;
 			}
 
-			if ($how == self::DELETE) {
+			if ($how === self::DELETE) {
 				return;
 			}
 
@@ -815,7 +828,7 @@ class DOMRange{
 			return $newNode;
 		}
 
-		if ($how == self::DELETE) {
+		if ($how === self::DELETE) {
 			return;
 		}
 
@@ -823,8 +836,8 @@ class DOMRange{
 	}
 
 	private function _traverseFullySelected(DOMNode $n, $how) {
-		if ($how != self::DELETE) {
-			return $how == self::CLONAR ? $this->clonar($n, TRUE) : $n;
+		if ($how !== self::DELETE) {
+			return $how === self::CLONAR ? $this->clonar($n, TRUE) : $n;
 		}
 
 		$n->parentNode->removeChild($n);
