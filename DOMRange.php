@@ -25,6 +25,7 @@ class DOMRange{
 	public $commonAncestorContainer;
 	
 	public function __construct(DOMDocument $doc) {
+		mb_internal_encoding("UTF-8");
 		$this->doc = $doc;
 		$this->START_CONTAINER = $doc;
 		$this->START_OFFSET = 0;
@@ -43,14 +44,13 @@ class DOMRange{
 	}
 	
 	public function offsetToTextNode( $offset, $nextNode_ = true ){
-		//$liText = $this->getTextNodes();
 		return $this->recOffset($this->doc, max($offset,0), $nextNode_);
 	}
 	
 	private function recOffset(DOMNode $ndPai, $offset, $nextNode_, &$len = 0){
 		foreach( $ndPai->childNodes as $ndFilho ){
 			if( $ndFilho->nodeType === 3 ){
-				$txtLen = mb_strlen( $ndFilho->nodeValue );
+				$txtLen = mb_strlen( $ndFilho->nodeValue, "UTF-8" );
 				$len += $txtLen;
 				if( $len > $offset || ($len >= $offset && !$nextNode_) ) return ['nd'=>$ndFilho,'offset'=>$txtLen - ($len - $offset)];
 			}else if($ndFilho->nodeType === 1){
@@ -125,7 +125,7 @@ class DOMRange{
 
 	public function selectNodeContents(DOMNode $n) {
 		$this->setStart($n, 0);
-		$this->setEnd($n, $n->nodeType === 1 ? $n->childNodes->length : mb_strlen($n->nodeValue));
+		$this->setEnd($n, $n->nodeType === 1 ? $n->childNodes->length : mb_strlen($n->nodeValue,"UTF-8"));
 	}
 
 	public function compareBoundaryPoints($h, DOMRange $r) {
@@ -167,6 +167,9 @@ class DOMRange{
 		return $this->_traverse(self::EXTRACT);
 	}
 
+	/**
+	 * @return DOMDocumentFragment
+	 */
 	public function cloneContents() {
 		return $this->_traverse(self::CLONAR);
 	}
@@ -175,14 +178,14 @@ class DOMRange{
 		$startContainer = $this->START_CONTAINER;
 		$startOffset = $this->START_OFFSET;
 		$nn;
-		$o;
+		$o = null;
 
 		// Node is TEXT_NODE or CDATA
 		if (($startContainer->nodeType === 3 || $startContainer->nodeType === 4) && $startContainer->nodeValue) {
 			if (!$startOffset) {
 				// At the start of text
 				$startContainer->parentNode->insertBefore($n, $startContainer);
-			} else if ($startOffset >= mb_strlen($startContainer->nodeValue)) {
+			} else if ($startOffset >= mb_strlen($startContainer->nodeValue,"UTF-8")) {
 				// At the end of text
 				$this->insertAfter($n, $startContainer);
 			} else {
@@ -209,9 +212,16 @@ class DOMRange{
 	}
 
 	public function surroundContents(DOMNode $n) {
+		$p = $this->START_CONTAINER->parentNode;
 		$f = $this->extractContents();
-
+		if(!$this->START_CONTAINER->parentNode){
+			//gambis para caso todo o texto seja retirado
+			$this->START_OFFSET = 0;
+			$this->START_CONTAINER = $p;
+			$this->collapse(true);
+		}
 		$this->insertNode($n);
+		
 		$n->appendChild($f);
 		$this->selectNode($n);
 	}
@@ -488,13 +498,14 @@ class DOMRange{
 		if ($this->START_OFFSET === $this->END_OFFSET) {
 			return $frag;
 		}
-
+		
+		
 		// Text node needs special case handling
 		if ($this->START_CONTAINER->nodeType === 3 ) {
 			// get the substring
 			$s = $this->START_CONTAINER->nodeValue;
 			$len = $this->END_OFFSET - $this->START_OFFSET;
-			$sub = mb_substr($s, $this->START_OFFSET, $len, "utf-8");
+			$sub = mb_substr($s, $this->START_OFFSET, $len, "UTF-8");
 			
 			// set the original text node to its new value
 			if ($how !== self::CLONAR) {
@@ -502,7 +513,7 @@ class DOMRange{
 				$start = $this->START_OFFSET;
 				
 				
-				if ($start === 0 && $len >= mb_strlen($n->nodeValue)) {
+				if ($start === 0 && $len >= mb_strlen($n->nodeValue,"UTF-8")) {
 					$n->parentNode->removeChild($n);
 				} else {
 					$n->deleteData($start, $len);
@@ -516,7 +527,7 @@ class DOMRange{
 				return;
 			}
 
-			if (mb_strlen($sub) > 0) {
+			if (mb_strlen($sub,"UTF-8") > 0) {
 				$frag->appendChild($this->doc->createTextNode($sub));
 			}
 
@@ -530,7 +541,6 @@ class DOMRange{
 		while ($n && $cnt > 0) {
 			$sibling = $n->nextSibling;
 			$xferNode = $this->_traverseFullySelected($n, $how);
-
 			if ($frag) {
 				$frag->appendChild($xferNode);
 			}
@@ -806,12 +816,12 @@ class DOMRange{
 
 			if ($isLeft) {
 				$offset = $this->START_OFFSET;
-				$newNodeValue = mb_substr($txtValue,$offset);
-				$oldNodeValue = mb_substr($txtValue, 0, $offset);
+				$newNodeValue = mb_substr($txtValue,$offset,null,"UTF-8");
+				$oldNodeValue = mb_substr($txtValue, 0, $offset,"UTF-8");
 			} else {
 				$offset = $this->END_OFFSET;
-				$newNodeValue = mb_substr($txtValue, 0, $offset);
-				$oldNodeValue = mb_substr($txtValue, $offset);
+				$newNodeValue = mb_substr($txtValue, 0, $offset,"UTF-8");
+				$oldNodeValue = mb_substr($txtValue, $offset,null,"UTF-8");
 			}
 
 			if ($how !== self::CLONAR) {
